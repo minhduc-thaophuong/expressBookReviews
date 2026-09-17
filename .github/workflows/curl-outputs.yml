@@ -8,6 +8,8 @@ on:
 jobs:
   curl-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: final_project
@@ -26,16 +28,16 @@ jobs:
           node index.js > server.log 2>&1 &
           sleep 5
           OUT=outputs.txt
+          mkdir -p ../outputs
           run() {
             local name="$1"; shift
             local cmd="$*"
             {
-              echo "===== $name ====="
               echo "\$ $cmd"
               eval "$cmd"
               echo
-              echo
-            } >> "$OUT"
+            } > "../outputs/$name.txt"
+            { echo "===== $name ====="; cat "../outputs/$name.txt"; echo; } >> "$OUT"
           }
           run githubrepo       'curl https://api.github.com/repos/${{ github.repository }}'
           run getallbooks      'curl localhost:5000/'
@@ -71,3 +73,14 @@ jobs:
             })().catch(e => { console.error(e); process.exit(1); });
           ' | tee axios.txt
           { echo '## Axios functions'; echo '```'; cat axios.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish outputs to the curl-outputs branch
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan curl-outputs
+          git rm -rf --cached . > /dev/null
+          git add outputs
+          git commit -m "cURL command outputs"
+          git push -f origin curl-outputs
